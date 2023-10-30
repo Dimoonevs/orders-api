@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"net/http"
+	"time"
 )
 
 func loadRouter() *chi.Mux {
@@ -37,10 +38,37 @@ func (a *App) Start(ctx context.Context) error {
 		Addr:    ":8080",
 		Handler: a.router,
 	}
-	err := server.ListenAndServe()
+
+	defer func() {
+		if err := a.rdb.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+
+	err := a.rdb.Ping().Err()
 	if err != nil {
-		return fmt.Errorf("ListenAndServe: %v", err)
+		return fmt.Errorf("Ping: %v", err)
 	}
+	fmt.Println("Redis connected")
+
+	ch := make(chan error, 1)
+
+	go func() {
+		err = server.ListenAndServe()
+		if err != nil {
+			ch <- fmt.Errorf("ListenAndServe: %v", err)
+		}
+		close(ch)
+	}()
+	select {
+	case err = <-ch:
+		return err
+	case <-ctx.Done():
+		timeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return server.Shutdown(timeout)
+	}
+
 	return nil
 
 }
