@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/Dimoonevs/orders-api.git/handler"
+	"github.com/Dimoonevs/orders-api.git/repository/order"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"net/http"
 	"time"
 )
 
-func loadRouter() *chi.Mux {
+func (a *App) loadRouter() {
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 
@@ -18,13 +19,17 @@ func loadRouter() *chi.Mux {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	router.Route("/orders", loadOrderRouter)
+	router.Route("/orders", a.loadOrderRouter)
 
-	return router
+	a.router = router
 }
 
-func loadOrderRouter(router chi.Router) {
-	orderHandler := &handler.Order{}
+func (a *App) loadOrderRouter(router chi.Router) {
+	orderHandler := &handler.Order{
+		Repo: &order.RedisRepo{
+			RedisClient: a.rdb,
+		},
+	}
 
 	router.Post("/", orderHandler.Create)
 	router.Get("/", orderHandler.List)
@@ -45,7 +50,7 @@ func (a *App) Start(ctx context.Context) error {
 		}
 	}()
 
-	err := a.rdb.Ping().Err()
+	err := a.rdb.Ping(ctx).Err()
 	if err != nil {
 		return fmt.Errorf("Ping: %v", err)
 	}

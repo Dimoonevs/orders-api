@@ -33,7 +33,7 @@ func (r *RedisRepo) Insert(ctx context.Context, order model.Order) error {
 		return fmt.Errorf("SetNX: %v", err)
 	}
 
-	if err := txn.SAdd(ctx, "orders", 0); err != nil {
+	if err := txn.SAdd(ctx, "orders", kye).Err(); err != nil {
 		txn.Discard()
 		return fmt.Errorf("SAdd: %v", err)
 	}
@@ -68,8 +68,8 @@ func (r *RedisRepo) FindByID(ctx context.Context, id uint64) (model.Order, error
 func (r *RedisRepo) DeleteByID(ctx context.Context, id uint64) error {
 	kye := orderIDKye(id)
 	txn := r.RedisClient.TxPipeline()
-	err := txn.Del(ctx, kye)
-	if errors.Is(err.Err(), redis.Nil) {
+	err := txn.Del(ctx, kye).Err()
+	if errors.Is(err, redis.Nil) {
 		txn.Discard()
 		return ErrNotExist
 	} else if err != nil {
@@ -77,7 +77,7 @@ func (r *RedisRepo) DeleteByID(ctx context.Context, id uint64) error {
 		return fmt.Errorf("Del: %v", err)
 	}
 
-	if err := txn.SRem(ctx, "orders", 0); err != nil {
+	if err := txn.SRem(ctx, "orders", kye).Err(); err != nil {
 		txn.Discard()
 		return fmt.Errorf("SRem: %v", err)
 	}
@@ -127,12 +127,11 @@ func (r *RedisRepo) FindAll(ctx context.Context, page FindAllPage) (FindAllResul
 			Orders: []model.Order{},
 		}, nil
 	}
-
 	xs, err := r.RedisClient.MGet(ctx, keys...).Result()
 	if err != nil {
 		return FindAllResult{}, fmt.Errorf("MGet: %v", err)
 	}
-
+	//fmt.Println(xs)
 	orders := make([]model.Order, len(xs))
 
 	for i, x := range xs {

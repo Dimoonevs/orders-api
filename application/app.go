@@ -1,7 +1,7 @@
 package application
 
 import (
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 	"net/http"
 )
 
@@ -12,8 +12,8 @@ type App struct {
 
 func New() *App {
 	app := &App{
-		router: loadRouter(),
-		rdb:    redis.NewClient(&redis.Options{}),
+		rdb: redis.NewClient(&redis.Options{}),
 	}
+	app.loadRouter()
 	return app
 }
